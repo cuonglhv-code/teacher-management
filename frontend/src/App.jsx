@@ -15,6 +15,7 @@ import WorkloadDashboard from './pages/WorkloadDashboard';
 import HRDashboard from './pages/HRDashboard';
 import ReportsPage from './pages/ReportsPage';
 import Home from './pages/Home';
+import AvailabilityEditor from './components/AvailabilityEditor';
 
 const theme = createTheme({
   palette: {
