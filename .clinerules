@@ -1,0 +1,71 @@
+# Cline Rules for JTWMS (Teacher Workforce Management System)
+# This file governs how the AI agent builds and modifies this project.
+
+## Project Identity
+- This is a full-stack web app for managing teacher scheduling at 10 English centres.
+- Stack: FastAPI (Python) backend, React (with MUI) frontend, PostgreSQL database.
+- Deployment target: Vercel (serverless functions + static frontend).
+
+## Memory Management
+- Always read the `memory-bank/` folder at the start of a new session.
+- After every meaningful code change, update `memory-bank/progress.md` and the relevant context file (productContext, systemPatterns, activeContext) if the decision affects the whole project.
+- Do not delete memory-bank files; only update them.
+
+## Non-Negotiable Business Rules
+1. **Full-time teachers are paid fixed salary.**  
+   The scheduling engine must always try to fill FT teachers up to their contracted hours BEFORE assigning any part-time teacher.  
+   If a class can be taught by an FT teacher with available hours, it must never be assigned to a PT teacher in the automated draft.
+
+2. **Part-time teachers are paid only for actual teaching hours.**  
+   They are variable cost. They can be assigned only to overflow classes after all FT capacity is exhausted (or if FT teachers lack required qualifications).
+
+3. **Human approval gate is mandatory.**  
+   The system must NEVER publish a timetable automatically.  
+   Always require an explicit manager “publish” action. All auto-generated slots must be “Draft” status.
+
+4. **Salary data is HR‑only.**  
+   APIs and UI components must enforce role-based access: salary, hourly_rate, and labour cost data visible only to users with HR role.
+
+5. **Contracts cannot be violated silently.**  
+   The scheduling engine must not exceed a FT teacher's contracted maximum hours per week without an explicit manager override logged with a reason.
+
+## Coding Standards
+- **Backend:** Python 3.11+, FastAPI, SQLAlchemy, Pydantic.  
+  - All functions have type hints and docstrings.  
+  - Every endpoint has a corresponding Pydantic response model.  
+  - Use proper HTTP status codes and error handling.
+- **Frontend:** React 18+, functional components, hooks, MUI components.  
+  - Keep components small and reusable.  
+  - Use React Router for navigation.  
+  - Handle loading, empty, and error states in every data-fetching component.
+- **Testing:**  
+  - Write unit tests for all backend business logic (using pytest).  
+  - Write integration tests for critical API endpoints.  
+  - Frontend: use Jest + React Testing Library for key user flows.  
+  - Do not commit code that breaks existing tests.
+
+## Scheduling Engine Specifics
+- The core scheduling algorithm is a two-phase greedy constraint solver.  
+  - Phase 1: only FT teachers, maximising utilisation. Hard constraints enforced.  
+  - Phase 2: PT teachers for remaining classes.  
+- The constraint set is defined in `memory-bank/systemPatterns.md`. Always refer to it.  
+- The scheduling function must return a detailed conflict report and list of unassigned classes with reasons.  
+- For long-running scheduling tasks, consider breaking into async execution, but always respect Vercel serverless timeouts.
+
+## Forecasting & HR Alerts
+- Forecast metrics (Unassigned FT Rate > 50%, Available Teacher Rate < 20%) must trigger the correct alerts or headcount requests automatically.  
+- Alerts are additive; do not remove existing gap-triggered recruitment logic.  
+- Always log forecast outputs to the database for audit.
+
+## Change Management
+- When a requirement changes, update `memory-bank/activeContext.md` with the decision and date.  
+- If you need to refactor, explain the reasoning in the commit message and update the relevant memory-bank file.
+
+## Communication Style
+- When proposing a solution, first outline the plan in plain text, then proceed.  
+- after completing a multi-step task, summarise what was done and which memory-bank files were updated.
+- If you encounter ambiguity, ask for clarification rather than assuming.
+
+## Start and End of Session
+- **Start**: Read `memory-bank/projectbrief.md`, `productContext.md`, and `activeContext.md`.  
+- **End**: Update `progress.md` with a ✅ for completed steps and commit the changes.

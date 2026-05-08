@@ -1,0 +1,123 @@
+# Progress Tracker
+
+## Phase 1 – Core Data & Scheduling Engine
+- [x] 1.1 Project scaffolding (FastAPI + React + Docker Compose)
+- [x] 1.2 PostgreSQL schema and Alembic migrations
+- [x] 1.3 Teacher CRUD + Availability + Leave APIs
+- [x] 1.4 Class and Room inventory APIs
+- [x] 1.5 Scheduling engine: two‑phase algorithm + conflict checker
+- [x] 1.6 Draft timetable generation endpoint (with human approval flag) + full timetable management API
+- [x] 1.7 Basic React pages: Teacher list, Class list, Room list
+- [x] 1.8 Simple timetable view (table format, not canvas yet) + centre-specific frontend pages
+
+## Phase 2 – Forecasting, HR, Reporting (Weeks 9–16)
+- [x] 2.1 Workload tracker and utilisation dashboard
+  - Backend: GET /api/v1/teachers/{teacher_id}/workload endpoint returns contracted hours, assigned hours, utilisation %
+  - Backend: GET /api/v1/centres/{centre_id}/utilization returns under-utilized teacher count and rate
+  - Frontend: WorkloadDashboard.jsx with coloured utilisation bars and week selector
+- [x] 2.2 12‑week supply forecast endpoint
+  - Created backend/app/forecasting/forecast.py with compute_12_week_forecast() function
+  - Calculates demand hours, supply hours (FT-first simulation), gap, unassigned FT rate, available teacher rate
+  - API: POST /api/v1/forecasts/{centre_id}/compute and GET /api/v1/forecasts/{centre_id}
+  - Scheduled task: APScheduler runs every Sunday at 23:00 (backend/app/scheduler.py)
+- [x] 2.3 Unassigned FT rate and Available Teacher rate calculations
+  - Implemented in forecast.py: triggers alerts when Unassigned FT Rate > 50% or Available Teacher Rate < 20%
+  - Auto-generates HeadcountRequest when Available Teacher Rate < 20%
+- [x] 2.4 Headcount request workflow (backend + UI)
+  - Backend: HR alerts endpoint GET /api/v1/hr/alerts (under-utilization, contract expiry, open requests)
+  - Backend: Headcount request management (list, approve, reject, mark-filled)
+  - Frontend: HRDashboard.jsx with alerts accordion and headcount request list with approve/reject buttons
+- [x] 2.5 Contract renewal alerts
+  - Added fields to Teacher model: contract_end_date, renewal_status, under_utilized_weeks, is_under_utilized
+  - Backend: PUT /api/v1/teachers/{teacher_id}/contract-renewal and /resign endpoints
+  - Backend: Daily check for contracts expiring within 60 days (check_contract_expiry_and_notify)
+  - Impact assessment on teacher resignation: finds future timetable slots and marks for reassignment
+- [x] 2.6 Reporting endpoints and basic dashboards
+  - Backend: Reporting endpoints in /api/v1/reports/ (KPIs: fill-rate, utilisation, cost-efficiency)
+  - Backend: CSV export endpoint GET /api/v1/reports/export/csv
+  - Frontend: ReportsPage.jsx with report type selector, date range picker, table display, and CSV export button
+
+## Phase 3 – Integration Testing (Week 17)
+- [x] 3.1 Timetable generation endpoint tests
+  - Created backend/tests/test_integration.py with TestTimetableGeneration class
+  - test_ft_only_all_classes_assigned: Verifies FT-only assignment, all classes assigned, no conflicts
+  - test_pt_overflow_required: Tests overflow to PT teacher when FT capacity insufficient
+  - test_qualification_mismatch_unschedulable: Class with unmatched qualification remains unassigned
+  - test_conflict_detection: Verifies conflict report when double-booking would occur
+- [x] 3.2 Forecast computation endpoint tests
+  - TestForecastComputation class with test_basic_forecast_computation
+  - Verifies 12-week forecast creation with all required fields (projected_demand_hours, available_ft_hours, etc.)
+  - test_ft_first_supply_simulation: Confirms FT teachers assigned first in supply simulation
+- [x] 3.3 Alert triggering tests
+  - TestAlertTriggering class with test_unassigned_ft_rate_alert
+  - Tests auto-creation of headcount requests when Unassigned FT Rate > 50%
+  - test_available_teacher_rate_alert: Verifies alert when Available Teacher Rate < 20%
+  - test_contract_expiry_alert: Checks alerts for contracts expiring within 60 days
+- [x] 3.4 Test infrastructure
+  - In-memory SQLite database setup with fixtures (db_session, client)
+  - Helper functions: create_centre, create_teacher, create_room, create_class
+  - FastAPI TestClient with database dependency override
+
+
+## Phase 4 – Production Deployment (Week 18)
+- [x] 4.1 Create Vercel entry point (api/index.py)
+  - Created `backend/api/index.py` that imports FastAPI app from `app.main`
+  - Configured Python path for Vercel serverless environment
+- [x] 4.2 Configure vercel.json for Neon PostgreSQL
+  - Updated `backend/vercel.json` to point to `api/index.py`
+  - Routes all requests to the new entry point
+- [x] 4.3 Create production migration script (run_migration_prod.py)
+  - Script reads DATABASE_URL from environment
+  - Ensures SSL mode is set for Neon (`?sslmode=require`)
+  - Runs Alembic upgrade head
+  - Prints success/failure messages
+- [x] 4.4 Update README.md with deployment guide
+  - Added detailed Vercel deployment steps
+  - Neon connection string instructions
+  - Environment variables configuration
+  - Migration instructions via Vercel CLI
+  - Verification steps for /docs and database connectivity
+- [x] 4.5 Mobile-first UI and PWA setup
+  - Created `frontend/public/manifest.json` for PWA
+  - Created `frontend/public/service-worker.js` with caching strategy
+  - Updated `frontend/src/main.jsx` to register service worker
+  - Made CentreTimetable.jsx responsive (mobile list <960px, desktop table)
+  - Created Home.jsx with "Submit Weekly Availability" button for teachers
+  - Updated App.jsx with Home route and proper AvailabilityEditor route
+
+## Notes
+- Project scaffolded with FastAPI backend, Vite+React frontend, Docker Compose for PostgreSQL.
+- All core data models created: Teacher, Centre, Room, Class, TeacherAvailability, Leave, TimetableSlot, HeadcountRequest, ForecastPeriod.
+- Alembic migration created (manual — pending DB connection for autogenerate).
+- Seed script creates 2 centres, 5 teachers (3 FT + 2 PT), 3 rooms, availability slots, and 3 classes.
+- Backend routes: Teachers (CRUD + Availability + Leave), Centres, Rooms, Classes (with status workflow).
+- Frontend pages: Teacher list (DataGrid), Teacher detail/edit, Room manager, Class list/filter, Class create/edit.
+- Role-based access implemented via `?role=` query parameter (HR sees salary fields).
+- **Scheduling engine** (`backend/app/scheduling/engine.py`) implemented as a two-phase greedy constraint solver:
+  - Phase 1: Assigns FT teachers first, maximising utilisation up to contracted hours.
+  - Phase 2: Assigns PT teachers to overflow classes.
+  - Hard constraints: no double-booking (teacher/room), room capacity, qualification match, availability window, FT ceiling.
+  - Soft constraints: +500 FT fill, +200 centre match, +100 preferred day, -50 per remaining hour.
+  - Output: list of Draft TimetableSlots, unassigned list with reasons, conflict report.
+  - 4 unit tests passing (normal FT-only, PT overflow, qualification mismatch, no double-booking).
+- **Timetable API endpoints** fully implemented in `backend/app/api/routes/timetable.py`:
+  - POST /api/v1/timetable/generate-draft: Triggers scheduling engine for a centre/date range, returns draft ID.
+  - GET /api/v1/timetable/drafts/{centre_id}: Returns current draft with slots and conflict details.
+  - PUT /api/v1/timetable/slots/{slot_id}/override: Academic Manager can change teacher/room/time for a slot.
+  - POST /api/v1/timetable/publish/{draft_id}: Approves draft, marks slots as published, sets classes to Timetabled.
+  - All protected endpoints enforce Academic Manager role checks.
+- **Frontend centre-specific pages** created in `frontend/src/pages/`:
+  - CentreDashboard.jsx: Placeholder dashboard with navigation cards to teachers/classes/rooms/timetable.
+  - CentreTeachers.jsx: Filtered teacher list for a specific centre using DataGrid.
+  - CentreClasses.jsx: Filtered class list for a specific centre using DataGrid.
+  - CentreRooms.jsx: Filtered room list for a specific centre using DataGrid.
+  - CentreTimetable.jsx: Read-only timetable view with rooms as rows and time slots (day + hour range) as columns, displaying assigned class and teacher per slot.
+  - Updated `frontend/src/App.jsx` with new routes: `/centres/:id/dashboard`, `/centres/:id/teachers`, `/centres/:id/classes`, `/centres/:id/rooms`, `/centres/:id/timetable`.
+  - Added API functions in `frontend/src/api/centres.js` (fetchCentres, fetchCentre) and `frontend/src/api/timetable.js` (fetchCentreDraft, generateDraft, publishDraft).
+- **Vercel deployment** configured:
+  - Created `backend/api/index.py` as Vercel serverless entry point
+  - Updated `backend/vercel.json` to route to new entry point
+  - Created `backend/run_migration_prod.py` for Neon PostgreSQL migrations
+  - Created `backend/.env.example` with all required environment variables
+  - Updated `frontend/src/api/client.js` to use VITE_API_BASE_URL
+  - Added comprehensive deployment guide to README.md
