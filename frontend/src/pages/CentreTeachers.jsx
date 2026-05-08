@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Container, Typography, Box, CircularProgress, Alert, DataGrid
+  Container, Typography, Box, CircularProgress, Alert
 } from '@mui/material';
+import { DataGrid } from '@mui/x-data-grid';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTeachers } from '../api/teachers';
 
