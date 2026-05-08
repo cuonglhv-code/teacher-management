@@ -61,6 +61,12 @@
 
 ## Phase 4 – Production Deployment (Week 18)
 - [x] 4.1 Create Vercel entry point (api/index.py)
+- [x] 4.6 Fix Vercel build error: Add date-fns dependency
+  - Error: `"addDays" is not exported by "__vite-optional-peer-dep:date-fns/addDays:@mui/x-date-pickers"`
+  - Root cause: `@mui/x-date-pickers` requires `date-fns` as peer dependency but it was missing
+  - Fix: Added `date-fns: ^4.1.0` to frontend/package.json
+  - Verified: Local build succeeds with `npm run build`
+  - Committed and pushed: commit b5f9e9c
   - Created `backend/api/index.py` that imports FastAPI app from `app.main`
   - Configured Python path for Vercel serverless environment
 - [x] 4.2 Configure vercel.json for Neon PostgreSQL
